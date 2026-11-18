@@ -82,6 +82,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return;
   }
 
+  if (req.method === 'GET') {
+    res.status(200).json({
+      ok: true,
+      provider: 'resend',
+      configured: Boolean(process.env.RESEND_API_KEY?.trim()),
+    });
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.status(405).json({ ok: false, error: 'Method not allowed.' });
     return;

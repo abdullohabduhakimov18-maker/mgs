@@ -1,8 +1,7 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Check, Send } from 'lucide-react';
 
 const RECIPIENT_EMAIL = 'abdullohabduhakimov18@gmail.com';
-const FORMSUBMIT_ENDPOINT = `https://formsubmit.co/${RECIPIENT_EMAIL}`;
 const FORMSUBMIT_AJAX_ENDPOINT = `https://formsubmit.co/ajax/${RECIPIENT_EMAIL}`;
 
 type SubmitState = 'idle' | 'sending' | 'sent' | 'activation' | 'error';
@@ -26,22 +25,7 @@ export function NoteFormSection() {
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [feedbackNote, setFeedbackNote] = useState('');
 
-  const fallbackFormRef = useRef<HTMLFormElement | null>(null);
-  const fallbackMessageInputRef = useRef<HTMLInputElement | null>(null);
-
   const trimmedMessage = message.trim();
-
-  const submitViaHiddenIframe = (text: string): boolean => {
-    if (fallbackFormRef.current && fallbackMessageInputRef.current) {
-      fallbackMessageInputRef.current.value = text;
-      fallbackFormRef.current.submit();
-      setSubmitState('sent');
-      setFeedbackNote('Your secret message has been sent.');
-      setMessage('');
-      return true;
-    }
-    return false;
-  };
 
   const tryFormSubmitFallback = async (text: string) => {
     try {
@@ -87,12 +71,8 @@ export function NoteFormSection() {
       ) {
         setSubmitState('activation');
         setFeedbackNote(
-          `One-time activation needed for this deployed URL: please click the confirmation link just sent to ${RECIPIENT_EMAIL}, then press Send again.`,
+          `One-time activation needed for this deployed URL: please click the confirmation link just sent to ${RECIPIENT_EMAIL} (check Spam too), then press Send again.`,
         );
-        return;
-      }
-
-      if (submitViaHiddenIframe(text)) {
         return;
       }
 
@@ -102,9 +82,6 @@ export function NoteFormSection() {
           'Could not send right now. Please try again in a moment.',
       );
     } catch {
-      if (submitViaHiddenIframe(text)) {
-        return;
-      }
       setSubmitState('error');
       setFeedbackNote('Could not send right now. Please try again in a moment.');
     }
@@ -147,7 +124,7 @@ export function NoteFormSection() {
         response.status === 404 ||
         response.status === 405 ||
         data?.code === 'MISSING_RESEND_KEY' ||
-        !data
+        (response.ok && !data)
       ) {
         await tryFormSubmitFallback(trimmedMessage);
         return;
@@ -242,26 +219,6 @@ export function NoteFormSection() {
           </form>
         )}
 
-        <iframe
-          name="secret-message-delivery-frame"
-          title="Secret message delivery"
-          className="hidden"
-          aria-hidden="true"
-        />
-        <form
-          ref={fallbackFormRef}
-          action={FORMSUBMIT_ENDPOINT}
-          method="POST"
-          target="secret-message-delivery-frame"
-          className="hidden"
-          aria-hidden="true"
-        >
-          <input type="hidden" name="name" value="Hamidabonu" />
-          <input type="hidden" name="_subject" value="Secret message" />
-          <input type="hidden" name="_template" value="table" />
-          <input type="hidden" name="_captcha" value="false" />
-          <input ref={fallbackMessageInputRef} type="hidden" name="message" value="" />
-        </form>
       </div>
     </section>
   );

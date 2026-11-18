@@ -85,6 +85,14 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: '32kb' }));
 
+  app.get('/api/secret-message', (_req: Request, res: Response) => {
+    res.status(200).json({
+      ok: true,
+      provider: 'resend',
+      configured: Boolean(process.env.RESEND_API_KEY?.trim()),
+    });
+  });
+
   app.post('/api/secret-message', async (req: Request, res: Response) => {
     const rawMessage = typeof req.body?.message === 'string' ? req.body.message : '';
     const trimmedMessage = rawMessage.trim();
