@@ -11,7 +11,6 @@ export type ExperienceStage = 'envelope' | 'opening' | 'circulating' | 'name' | 
 
 interface SpaceParticleCanvasProps {
   stage: ExperienceStage;
-  replayNonce: number;
   onOpenEnvelope: () => void;
   onFlowerInteract?: () => void;
 }
@@ -84,7 +83,6 @@ function easeOutQuart(t: number): number {
 
 export function SpaceParticleCanvas({
   stage,
-  replayNonce,
   onOpenEnvelope,
   onFlowerInteract,
 }: SpaceParticleCanvasProps) {
@@ -134,36 +132,6 @@ export function SpaceParticleCanvas({
     onFlowerInteractRef.current = onFlowerInteract;
   }, [onFlowerInteract]);
 
-  // Scatter particles across space when replaying from the beginning
-  useEffect(() => {
-    if (replayNonce === 0) return;
-    const particles = particlesRef.current;
-    const { width, height } = sizeRef.current;
-    const cx = width / 2;
-    const cy = height * 0.42;
-    const spread = Math.max(width, height) * 0.72;
-
-    for (let i = 0; i < particles.length; i++) {
-      const p = particles[i];
-      const angle = Math.random() * Math.PI * 2;
-      const dist = Math.sqrt(Math.random()) * spread;
-      p.x = cx + Math.cos(angle) * dist;
-      p.y = cy + Math.sin(angle) * dist;
-      p.prevX = p.x;
-      p.prevY = p.y;
-      p.startX = p.x;
-      p.startY = p.y;
-      p.r = 225;
-      p.g = 232;
-      p.b = 248;
-      p.startR = 225;
-      p.startG = 232;
-      p.startB = 248;
-      p.size = 0.9 + Math.random() * 0.9;
-      p.startSize = p.size;
-    }
-    stageStartedAtRef.current = performance.now();
-  }, [replayNonce]);
 
   // Synchronize particle starting snapshots whenever `stage` changes
   useEffect(() => {

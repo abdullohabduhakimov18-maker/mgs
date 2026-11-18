@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
 import { SpaceParticleCanvas, type ExperienceStage } from './components/SpaceParticleCanvas';
-import { MusicPlayer } from './components/MusicPlayer';
 import { MultilingualLoveCaption } from './components/MultilingualLoveCaption';
 
 const OPENING_DURATION_MS = 2500;
@@ -11,12 +9,77 @@ const BACKGROUND_TRACK_SRC = '/assets/aistudio/_________________________________
 
 export default function App() {
   const [stage, setStage] = useState<ExperienceStage>('envelope');
-  const [replayNonce, setReplayNonce] = useState(0);
-  const [musicAutoPlaySignal, setMusicAutoPlaySignal] = useState(0);
   const [envelopeReady, setEnvelopeReady] = useState(false);
   const [showFlowerCaption, setShowFlowerCaption] = useState(false);
 
   const timersRef = useRef<number[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUnlockedRef = useRef(false);
+  const fadeFrameRef = useRef<number | null>(null);
+
+  const cancelFade = useCallback(() => {
+    if (fadeFrameRef.current !== null) {
+      cancelAnimationFrame(fadeFrameRef.current);
+      fadeFrameRef.current = null;
+    }
+  }, []);
+
+  const fadeVolumeIn = useCallback(
+    (audio: HTMLAudioElement, targetVol = 0.65, durationMs = 1100) => {
+      cancelFade();
+      const clampedTarget = Math.max(0, Math.min(1, targetVol));
+      audio.volume = 0;
+      const start = performance.now();
+      const step = (now: number) => {
+        const progress = Math.max(0, Math.min(1, (now - start) / durationMs));
+        audio.volume = Math.max(0, Math.min(1, clampedTarget * progress));
+        if (progress < 1) {
+          fadeFrameRef.current = requestAnimationFrame(step);
+        } else {
+          fadeFrameRef.current = null;
+        }
+      };
+      fadeFrameRef.current = requestAnimationFrame(step);
+    },
+    [cancelFade],
+  );
+
+  const startBackgroundMusic = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio || audioUnlockedRef.current || !audio.paused) return;
+
+    void audio
+      .play()
+      .then(() => {
+        audioUnlockedRef.current = true;
+        fadeVolumeIn(audio, 0.65, 1100);
+      })
+      .catch(() => {
+        // Browser blocked unmuted autoplay before user interaction; interaction listeners will unlock it.
+      });
+  }, [fadeVolumeIn]);
+
+  // Play automatically on mount, and unlock immediately on first interaction if browser blocks autoplay
+  useEffect(() => {
+    startBackgroundMusic();
+
+    const onFirstGesture = () => {
+      startBackgroundMusic();
+      if (audioUnlockedRef.current) {
+        window.removeEventListener('pointerdown', onFirstGesture);
+        window.removeEventListener('keydown', onFirstGesture);
+      }
+    };
+
+    window.addEventListener('pointerdown', onFirstGesture, { passive: true });
+    window.addEventListener('keydown', onFirstGesture, { passive: true });
+
+    return () => {
+      cancelFade();
+      window.removeEventListener('pointerdown', onFirstGesture);
+      window.removeEventListener('keydown', onFirstGesture);
+    };
+  }, [cancelFade, startBackgroundMusic]);
 
   const clearScheduled = useCallback(() => {
     timersRef.current.forEach((id) => window.clearTimeout(id));
@@ -27,13 +90,6 @@ export default function App() {
     return () => clearScheduled();
   }, [clearScheduled]);
 
-  // Keep viewport at top during pre-flower stages
-  useEffect(() => {
-    if (stage !== 'flower' && typeof window !== 'undefined' && window.scrollY > 0) {
-      window.scrollTo({ top: 0, behavior: 'auto' });
-    }
-  }, [stage]);
-
   // Fade in "For you" and "Open the envelope" right as the space dots finish forming the envelope
   useEffect(() => {
     if (stage !== 'envelope') return;
@@ -42,13 +98,13 @@ export default function App() {
       setEnvelopeReady(true);
     }, 1550);
     return () => window.clearTimeout(readyTimer);
-  }, [stage, replayNonce]);
+  }, [stage]);
 
   const handleOpenEnvelope = useCallback(() => {
     if (stage !== 'envelope') return;
     clearScheduled();
     setShowFlowerCaption(false);
-    setMusicAutoPlaySignal((n) => n + 1);
+    startBackgroundMusic();
     setStage('opening');
 
     const circulateTimer = window.setTimeout(() => {
@@ -68,33 +124,25 @@ export default function App() {
     }, OPENING_DURATION_MS + CIRCULATE_DURATION_MS + NAME_HOLD_DURATION_MS + 2750);
 
     timersRef.current = [circulateTimer, nameTimer, flowerTimer, captionTimer];
-  }, [clearScheduled, stage]);
-
-  const handleReplay = useCallback(() => {
-    clearScheduled();
-    setShowFlowerCaption(false);
-    setEnvelopeReady(false);
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-    setReplayNonce((n) => n + 1);
-    setStage('envelope');
-  }, [clearScheduled]);
+  }, [clearScheduled, stage, startBackgroundMusic]);
 
   return (
     <main className="relative h-[100svh] w-full overflow-hidden bg-[#05060c] select-none">
+      {/* Headless background music with no UI controls */}
+      <audio
+        ref={audioRef}
+        src={BACKGROUND_TRACK_SRC}
+        autoPlay
+        loop
+        preload="auto"
+        aria-hidden="true"
+        className="hidden"
+      />
+
       {/* Full-screen celestial particle field */}
       <SpaceParticleCanvas
         stage={stage}
-        replayNonce={replayNonce}
         onOpenEnvelope={handleOpenEnvelope}
-      />
-
-      {/* Left-aligned background music player */}
-      <MusicPlayer
-        src={BACKGROUND_TRACK_SRC}
-        title="Golden Brown"
-        autoPlaySignal={musicAutoPlaySignal}
       />
 
       {/* Hero Viewport (100svh) holding envelope and chamomile finale captions */}
@@ -133,19 +181,6 @@ export default function App() {
           style={{ top: '65%' }}
         >
           <MultilingualLoveCaption active={stage === 'flower' && showFlowerCaption} />
-
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={handleReplay}
-              disabled={stage !== 'flower' || !showFlowerCaption}
-              tabIndex={stage === 'flower' && showFlowerCaption ? 0 : -1}
-              className="pointer-events-auto inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-full border border-white/15 bg-white/5 px-5 py-2 text-xs font-medium tracking-wide text-slate-300 backdrop-blur-sm transition-all duration-200 hover:border-white/30 hover:bg-white/10 hover:text-white active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:pointer-events-none"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>Replay</span>
-            </button>
-          </div>
         </div>
       </section>
     </main>
