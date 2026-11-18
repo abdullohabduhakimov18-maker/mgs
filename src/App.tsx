@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { SpaceParticleCanvas, type ExperienceStage } from './components/SpaceParticleCanvas';
 import { MusicPlayer } from './components/MusicPlayer';
 import { MultilingualLoveCaption } from './components/MultilingualLoveCaption';
-import { NoteFormSection } from './components/NoteFormSection';
 
 const OPENING_DURATION_MS = 2500;
 const CIRCULATE_DURATION_MS = 1850;
@@ -82,19 +81,8 @@ export default function App() {
     setStage('envelope');
   }, [clearScheduled]);
 
-  const handleScrollToNote = useCallback(() => {
-    const el = document.getElementById('secret-message');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, []);
-
   return (
-    <main
-      className={`relative w-full bg-[#05060c] select-none ${
-        stage === 'flower' ? 'min-h-[100svh] overflow-x-hidden' : 'h-[100svh] overflow-hidden'
-      }`}
-    >
+    <main className="relative h-[100svh] w-full overflow-hidden bg-[#05060c] select-none">
       {/* Full-screen celestial particle field */}
       <SpaceParticleCanvas
         stage={stage}
@@ -157,23 +145,9 @@ export default function App() {
               <RotateCcw className="h-3.5 w-3.5" />
               <span>Replay</span>
             </button>
-
-            <button
-              type="button"
-              onClick={handleScrollToNote}
-              disabled={stage !== 'flower' || !showFlowerCaption}
-              tabIndex={stage === 'flower' && showFlowerCaption ? 0 : -1}
-              className="pointer-events-auto inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-full border border-rose-400/30 bg-rose-500/12 px-5 py-2 text-xs font-medium tracking-wide text-rose-100 backdrop-blur-sm transition-all duration-200 hover:border-rose-300/55 hover:bg-rose-500/22 hover:text-white active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 disabled:pointer-events-none"
-            >
-              <span>Secret message</span>
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
           </div>
         </div>
       </section>
-
-      {/* Scroll-down secret message input */}
-      {stage === 'flower' && <NoteFormSection />}
     </main>
   );
 }
